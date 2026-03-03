@@ -1,0 +1,9 @@
+task_id,task_name,duration,workers,cost_per_day,predecessors
+1,Excavation,5,6,50000,
+2,Foundation,7,8,70000,1
+3,Columns,6,6,60000,2
+4,Ground Slab,4,5,45000,2
+5,First Floor Slab,5,6,55000,3
+6,Second Floor Slab,5,6,55000,5
+7,MEP Rough-in,6,4,40000,4
+8,Finishing,8,5,50000,6;7
