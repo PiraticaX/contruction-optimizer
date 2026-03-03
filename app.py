@@ -8,53 +8,85 @@ from optimizer import run_all
 st.set_page_config(layout="wide")
 st.title("Quantum Construction Optimization Dashboard")
 
-# -----------------------------
+# ---------------------------------------
+# Sidebar Upload
+# ---------------------------------------
+
+st.sidebar.header("Upload Project Dataset")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV File",
+    type=["csv"]
+)
+
+required_columns = [
+    "task_id",
+    "task_name",
+    "duration",
+    "workers",
+    "cost_per_day",
+    "predecessors"
+]
+
+# ---------------------------------------
 # Load Dataset
-# -----------------------------
-df = pd.read_csv("dataset.csv")
+# ---------------------------------------
+
+if uploaded_file is not None:
+
+    try:
+        df = pd.read_csv(uploaded_file)
+
+        if not all(col in df.columns for col in required_columns):
+            st.error("Uploaded file does not match required format.")
+            st.stop()
+
+        st.success("Custom dataset loaded successfully.")
+
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        st.stop()
+
+else:
+    df = pd.read_csv("dataset.csv")
+    st.info("Using default dataset.")
 
 st.subheader("Project Dataset")
 st.dataframe(df)
 
-# -----------------------------
+# ---------------------------------------
 # Run Benchmark
-# -----------------------------
+# ---------------------------------------
+
 if st.button("Run Full Benchmark"):
 
     with st.spinner("Running Classical, AI and Quantum Solvers..."):
         results = run_all(df)
 
-    # Extract Results
     classical_dur, classical_cost, classical_sched = results["Classical"]
     ai_dur, ai_cost, ai_sched = results["AI-Heuristic"]
     quantum_dur, quantum_cost, quantum_sched = results["Quantum Benchmark"]
 
-    # -----------------------------
-    # KPI CARDS
-    # -----------------------------
+    # ---------------------------------------
+    # KPI Section
+    # ---------------------------------------
+
     st.subheader("Key Performance Indicators")
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric(
-        "Best Duration (Days)",
-        min(classical_dur, ai_dur, quantum_dur)
-    )
+    col1.metric("Best Duration (Days)",
+                min(classical_dur, ai_dur, quantum_dur))
 
-    col2.metric(
-        "Best Cost",
-        f"₹ {min(classical_cost, ai_cost, quantum_cost):,.0f}"
-    )
+    col2.metric("Best Cost",
+                f"₹ {min(classical_cost, ai_cost, quantum_cost):,.0f}")
 
-    col3.metric(
-        "Quantum Duration Improvement",
-        classical_dur - quantum_dur
-    )
+    col3.metric("Quantum Improvement",
+                classical_dur - quantum_dur)
 
-    # -----------------------------
+    # ---------------------------------------
     # Comparison Table
-    # -----------------------------
-    st.subheader("Solver Comparison")
+    # ---------------------------------------
 
     comparison_df = pd.DataFrame({
         "Method": ["Classical", "AI-Heuristic", "Quantum"],
@@ -62,35 +94,29 @@ if st.button("Run Full Benchmark"):
         "Cost": [classical_cost, ai_cost, quantum_cost]
     })
 
+    st.subheader("Solver Comparison")
     st.dataframe(comparison_df)
 
-    # -----------------------------
-    # Duration Chart
-    # -----------------------------
-    fig_duration = px.bar(
-        comparison_df,
-        x="Method",
-        y="Duration (Days)",
-        title="Duration Comparison",
-        color="Method"
-    )
-    st.plotly_chart(fig_duration, use_container_width=True)
+    # ---------------------------------------
+    # Charts
+    # ---------------------------------------
 
-    # -----------------------------
-    # Cost Chart
-    # -----------------------------
-    fig_cost = px.bar(
-        comparison_df,
-        x="Method",
-        y="Cost",
-        title="Cost Comparison",
-        color="Method"
+    st.plotly_chart(
+        px.bar(comparison_df, x="Method", y="Duration (Days)",
+               title="Duration Comparison", color="Method"),
+        use_container_width=True
     )
-    st.plotly_chart(fig_cost, use_container_width=True)
 
-    # -----------------------------
-    # TIMELINE SECTION
-    # -----------------------------
+    st.plotly_chart(
+        px.bar(comparison_df, x="Method", y="Cost",
+               title="Cost Comparison", color="Method"),
+        use_container_width=True
+    )
+
+    # ---------------------------------------
+    # Timeline Section
+    # ---------------------------------------
+
     st.subheader("Timeline Comparison")
 
     base_date = datetime.datetime(2026, 1, 1)
@@ -118,62 +144,36 @@ if st.button("Run Full Benchmark"):
 
         return pd.DataFrame(rows)
 
-
     classical_df = build_timeline_df(classical_sched, "Classical")
     ai_df = build_timeline_df(ai_sched, "AI-Heuristic")
     quantum_df = build_timeline_df(quantum_sched, "Quantum")
 
     tab1, tab2, tab3 = st.tabs(["Classical", "AI-Heuristic", "Quantum"])
 
-    with tab1:
-        if not classical_df.empty:
-            fig_classical = px.timeline(
-                classical_df,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Solver"
-            )
-            fig_classical.update_yaxes(autorange="reversed")
-            fig_classical.update_layout(height=700)
-            st.plotly_chart(fig_classical, use_container_width=True)
-        else:
-            st.info("No Classical schedule available.")
+    for tab, data in zip(
+        [tab1, tab2, tab3],
+        [classical_df, ai_df, quantum_df]
+    ):
+        with tab:
+            if not data.empty:
+                fig = px.timeline(
+                    data,
+                    x_start="Start",
+                    x_end="Finish",
+                    y="Task",
+                    color="Solver"
+                )
+                fig.update_yaxes(autorange="reversed")
+                fig.update_layout(height=700)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No schedule available.")
 
-    with tab2:
-        if not ai_df.empty:
-            fig_ai = px.timeline(
-                ai_df,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Solver"
-            )
-            fig_ai.update_yaxes(autorange="reversed")
-            fig_ai.update_layout(height=700)
-            st.plotly_chart(fig_ai, use_container_width=True)
-        else:
-            st.info("No AI schedule available.")
-
-    with tab3:
-        if not quantum_df.empty:
-            fig_quantum = px.timeline(
-                quantum_df,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Solver"
-            )
-            fig_quantum.update_yaxes(autorange="reversed")
-            fig_quantum.update_layout(height=700)
-            st.plotly_chart(fig_quantum, use_container_width=True)
-        else:
-            st.info("No Quantum schedule available.")
-
-    # -----------------------------
+    # ---------------------------------------
     # Worker Utilization
-    # -----------------------------
-    st.subheader("Worker Utilization Over Time")
+    # ---------------------------------------
+
+    st.subheader("Worker Allocation Over Time")
 
     def compute_worker_usage(schedule):
 
@@ -184,44 +184,30 @@ if st.button("Run Full Benchmark"):
         usage = [0] * horizon
 
         for _, row in df.iterrows():
-
             if row.task_id in schedule:
-
                 start = schedule[row.task_id]
-
                 for t in range(start, start + row.duration):
                     if t < horizon:
                         usage[t] += row.workers
 
         return usage
 
-
-    classical_usage = compute_worker_usage(classical_sched)
-    ai_usage = compute_worker_usage(ai_sched)
-    quantum_usage = compute_worker_usage(quantum_sched)
-
     fig_workers = go.Figure()
 
-    if classical_usage:
-        fig_workers.add_trace(go.Scatter(
-            y=classical_usage,
-            mode="lines",
-            name="Classical"
-        ))
+    for name, sched in {
+        "Classical": classical_sched,
+        "AI-Heuristic": ai_sched,
+        "Quantum": quantum_sched
+    }.items():
 
-    if ai_usage:
-        fig_workers.add_trace(go.Scatter(
-            y=ai_usage,
-            mode="lines",
-            name="AI-Heuristic"
-        ))
+        usage = compute_worker_usage(sched)
 
-    if quantum_usage:
-        fig_workers.add_trace(go.Scatter(
-            y=quantum_usage,
-            mode="lines",
-            name="Quantum"
-        ))
+        if usage:
+            fig_workers.add_trace(go.Scatter(
+                y=usage,
+                mode="lines",
+                name=name
+            ))
 
     fig_workers.update_layout(
         title="Worker Allocation Timeline",
@@ -232,4 +218,4 @@ if st.button("Run Full Benchmark"):
 
     st.plotly_chart(fig_workers, use_container_width=True)
 
-    st.success("Full Optimization Dashboard Generated Successfully.")
+    st.success("Dashboard Generated Successfully.")
