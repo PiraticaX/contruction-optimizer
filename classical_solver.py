@@ -1,10 +1,11 @@
 import pandas as pd
 from ortools.sat.python import cp_model
 
+
 def solve_classical(df, max_workers=15):
 
     model = cp_model.CpModel()
-    horizon = sum(df["duration"])
+    horizon = int(sum(df["duration"]))
 
     start_vars = {}
     end_vars = {}
@@ -39,19 +40,18 @@ def solve_classical(df, max_workers=15):
 
     model.AddCumulative(intervals, demands, max_workers)
 
-    # Objective
     makespan = model.NewIntVar(0, horizon, "makespan")
     model.AddMaxEquality(makespan, list(end_vars.values()))
-
-    total_cost = sum(row.duration * row.cost_per_day for _, row in df.iterrows())
-
     model.Minimize(makespan)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 10
+    solver.parameters.max_time_in_seconds = 5
     solver.Solve(model)
 
+    total_cost = sum(row.duration * row.cost_per_day for _, row in df.iterrows())
+
     schedule = {}
+
     for _, row in df.iterrows():
         schedule[row.task_id] = solver.Value(start_vars[row.task_id])
 

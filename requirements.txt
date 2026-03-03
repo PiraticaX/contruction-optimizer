@@ -4,4 +4,4 @@ plotly
 numpy
 ortools
 dimod
-neal
+dwave-neal
